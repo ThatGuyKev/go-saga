@@ -39,19 +39,12 @@ type SagaDefinitionBuilder struct {
 }
 
 type ISagaDefinitionBuilder interface {
-	step(channel string, stepForward Command, stepBackward Command)
-	start(payload interface{})
-	listen()
+	AddStep(channel string, stepForward Command, stepBackward Command)
+	Start(payload interface{})
+	Listen()
 }
 
-func (s *SagaDefinitionBuilder) checkIndex() error {
-	if s.index < 0 {
-		return errors.New("invalid index")
-	}
-	return nil
-}
-
-func (s *SagaDefinitionBuilder) step(channelName string, stepForward Command, stepBackward Command) {
+func (s *SagaDefinitionBuilder) AddStep(channelName string, stepForward Command, stepBackward Command) {
 	s.index += 1
 	phases := make(map[StepPhase]Command)
 	phases[STEP_FORWARD] = stepForward
@@ -85,7 +78,7 @@ func (s *SagaDefinitionBuilder) makeStepBackward(index int, payload interface{})
 	s.sagaChan <- msg
 }
 
-func (s *SagaDefinitionBuilder) start(payload interface{}) {
+func (s *SagaDefinitionBuilder) Start(payload interface{}) {
 	s.makeStepForward(0, payload)
 }
 
@@ -96,7 +89,7 @@ func NewSagaDefinition() ISagaDefinitionBuilder {
 
 }
 
-func (s *SagaDefinitionBuilder) listen() {
+func (s *SagaDefinitionBuilder) Listen() {
 	for {
 		sm := <-s.sagaChan
 		switch sm.saga.phase {
@@ -122,18 +115,18 @@ type User struct {
 	name string
 }
 
-func doSomething(P interface{}) error {
+func DoSomething(P interface{}) error {
 	if _, ok := P.(User); ok {
 		time.Sleep(time.Second)
 		// fmt.Println("I'm doing something for ", user.name, " :)")
 		return nil
 
 	} else {
-		return errors.New("Mismatch interface")
+		return errors.New("mismatch interface")
 	}
 }
 
-func compensation(P interface{}) error {
+func Compensate(P interface{}) error {
 	time.Sleep(time.Second)
 
 	return nil
@@ -143,23 +136,23 @@ func main() {
 
 	e := echo.New()
 	sagaProcessor := NewSagaDefinition()
-	sagaProcessor.step("START", Command{doSomething}, Command{compensation})
-	sagaProcessor.step("CREATE_EMPTY_CART", Command{doSomething}, Command{compensation})
-	sagaProcessor.step("ADD_ITEM_REQUEST", Command{doSomething}, Command{compensation})
-	sagaProcessor.step("RETRIEVE_PRODUCTS", Command{doSomething}, Command{compensation})
-	sagaProcessor.step("VALIDATE_CART", Command{doSomething}, Command{compensation})
-	sagaProcessor.step("MERGE_SIMILAR_ITEMS", Command{doSomething}, Command{compensation})
-	sagaProcessor.step("PRICE_CART", Command{doSomething}, Command{compensation})
-	sagaProcessor.step("CALCULATE_TOTALS", Command{doSomething}, Command{compensation})
-	sagaProcessor.step("PERSIST_NEW_CART", Command{doSomething}, Command{compensation})
-	sagaProcessor.step("END", Command{doSomething}, Command{compensation})
+	sagaProcessor.AddStep("START", Command{DoSomething}, Command{Compensate})
+	sagaProcessor.AddStep("CREATE_EMPTY_CART", Command{DoSomething}, Command{Compensate})
+	sagaProcessor.AddStep("ADD_ITEM_REQUEST", Command{DoSomething}, Command{Compensate})
+	sagaProcessor.AddStep("RETRIEVE_PRODUCTS", Command{DoSomething}, Command{Compensate})
+	sagaProcessor.AddStep("VALIDATE_CART", Command{DoSomething}, Command{Compensate})
+	sagaProcessor.AddStep("MERGE_SIMILAR_ITEMS", Command{DoSomething}, Command{Compensate})
+	sagaProcessor.AddStep("PRICE_CART", Command{DoSomething}, Command{Compensate})
+	sagaProcessor.AddStep("CALCULATE_TOTALS", Command{DoSomething}, Command{Compensate})
+	sagaProcessor.AddStep("PERSIST_NEW_CART", Command{DoSomething}, Command{Compensate})
+	sagaProcessor.AddStep("END", Command{DoSomething}, Command{Compensate})
 	go func() {
-		sagaProcessor.listen()
+		sagaProcessor.Listen()
 	}()
 	e.GET("/:name", func(c echo.Context) error {
 		user := User{id: "id", name: c.Param("name")}
 
-		sagaProcessor.start(user)
+		sagaProcessor.Start(user)
 
 		return nil
 
